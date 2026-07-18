@@ -1,0 +1,9 @@
+{
+  "item.sbwdronejammer.drone_jammer": "Генератор помех для дронов",
+  "message.sbwdronejammer.enabled": "Генератор помех включён.",
+  "message.sbwdronejammer.disabled": "Генератор помех выключен.",
+  "tooltip.sbwdronejammer.range": "Радиус помех: %s блоков",
+  "tooltip.sbwdronejammer.active": "Состояние: ВКЛ",
+  "tooltip.sbwdronejammer.inactive": "Состояние: ВЫКЛ",
+  "tooltip.sbwdronejammer.toggle": "ПКМ — включить или выключить"
+}

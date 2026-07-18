@@ -1,0 +1,11 @@
+{
+  "drone_detection_siren": {
+    "subtitle": "block.sbwdroneconfig.drone_detection_siren",
+    "sounds": [
+      {
+        "name": "sbwdroneconfig:block/drone_detection_siren",
+        "stream": true
+      }
+    ]
+  }
+}

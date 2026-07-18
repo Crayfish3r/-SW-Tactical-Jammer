@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="sbwdronejammer"
+version="0.2.0"
+displayName="SBW Drone Jammer"
+authors="Server Team"
+description='''Standalone drone signal jammer for Superb Warfare.'''
+
+[[dependencies.sbwdronejammer]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sbwdronejammer]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sbwdronejammer]]
+modId="superbwarfare"
+mandatory=true
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"

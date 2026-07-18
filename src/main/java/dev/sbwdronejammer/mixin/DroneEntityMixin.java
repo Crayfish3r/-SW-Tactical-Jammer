@@ -25,30 +25,9 @@ import java.util.UUID;
 public abstract class DroneEntityMixin implements DroneControllerAccess {
     @Shadow(remap = false)
     @Final
-    private static EntityDataAccessor<String> CONTROLLER = null;
+    private static EntityDataAccessor<String> CONTROLLER;
     @Unique
     private Vec3 sbwdronejammer$incomingMotion;
-
-    @Shadow(remap = false)
-    public abstract void setPower(float value);
-
-    @Shadow(remap = false)
-    public abstract void setLeftInputDown(boolean value);
-
-    @Shadow(remap = false)
-    public abstract void setRightInputDown(boolean value);
-
-    @Shadow(remap = false)
-    public abstract void setForwardInputDown(boolean value);
-
-    @Shadow(remap = false)
-    public abstract void setBackInputDown(boolean value);
-
-    @Shadow(remap = false)
-    public abstract void setUpInputDown(boolean value);
-
-    @Shadow(remap = false)
-    public abstract void setDownInputDown(boolean value);
 
     @Override
     public Optional<UUID> sbwdronejammer$controllerId() {
@@ -71,13 +50,14 @@ public abstract class DroneEntityMixin implements DroneControllerAccess {
         }
         DroneImpactHandler.afterMove(drone);
         sbwdronejammer$incomingMotion = drone.getDeltaMovement();
-        setLeftInputDown(false);
-        setRightInputDown(false);
-        setForwardInputDown(false);
-        setBackInputDown(false);
-        setUpInputDown(false);
-        setDownInputDown(false);
-        setPower(0.0F);
+        VehicleControlAccess controls = (VehicleControlAccess) (Object) this;
+        controls.sbwdronejammer$setLeftInputDown(false);
+        controls.sbwdronejammer$setRightInputDown(false);
+        controls.sbwdronejammer$setForwardInputDown(false);
+        controls.sbwdronejammer$setBackInputDown(false);
+        controls.sbwdronejammer$setUpInputDown(false);
+        controls.sbwdronejammer$setDownInputDown(false);
+        controls.sbwdronejammer$setPower(0.0F);
     }
 
     @Inject(method = "travel", at = @At("TAIL"), remap = false, require = 1)
@@ -89,7 +69,7 @@ public abstract class DroneEntityMixin implements DroneControllerAccess {
             return;
         }
 
-        setPower(0.0F);
+        ((VehicleControlAccess) (Object) this).sbwdronejammer$setPower(0.0F);
         FallPhysics.Motion motion = FallPhysics.next(
                 new FallPhysics.Motion(incoming.x, incoming.y, incoming.z),
                 DroneJamState.fallTicks(drone),

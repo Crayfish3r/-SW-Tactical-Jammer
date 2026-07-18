@@ -25,6 +25,9 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'info'
+        }
+
+        client {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
@@ -32,11 +35,15 @@ minecraft {
             }
         }
 
-        client {}
-
         server {
             args '--nogui'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
         }
+
     }
 }
 
@@ -50,6 +57,186 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.ow2.asm:asm:9.7.1'
+}
+
+def sbwProductionFileName = 'superbwarfare-0.8.9-final-mc1.20.1-6effe4385-all.jar'
+def sbwProductionUrl =
+        'https://cdn.modrinth.com/data/Cd3DYqzn/versions/LAITrju0/' + sbwProductionFileName
+def sbwProductionSha256 = '6eece0df9c927bddee3bd373fe90a2bbcba7157e9408ee0f94d13e04dc638395'
+def preparedSbwProductionJar = layout.buildDirectory.file("production-dependencies/${sbwProductionFileName}")
+
+tasks.register('prepareSbwProductionJar') {
+    description = 'Obtains and verifies the exact SuperbWarfare 0.8.9 production JAR.'
+    group = 'verification'
+    outputs.file(preparedSbwProductionJar)
+
+    doLast {
+        File target = preparedSbwProductionJar.get().asFile
+        target.parentFile.mkdirs()
+
+        List<File> localCandidates = []
+        if (providers.gradleProperty('sbwProductionJar').isPresent()) {
+            localCandidates.add(file(providers.gradleProperty('sbwProductionJar').get()))
+        }
+        localCandidates.add(file("run/mods/${sbwProductionFileName}"))
+        File localSource = localCandidates.find { it.isFile() }
+
+        if (localSource != null && localSource.canonicalFile != target.canonicalFile) {
+            java.nio.file.Files.copy(localSource.toPath(), target.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } else if (!target.isFile()) {
+            new URL(sbwProductionUrl).withInputStream { input ->
+                java.nio.file.Files.copy(input, target.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        target.withInputStream { input ->
+            byte[] buffer = new byte[8192]
+            for (int read; (read = input.read(buffer)) >= 0;) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        String actual = digest.digest().encodeHex().toString()
+        if (actual != sbwProductionSha256) {
+            target.delete()
+            throw new GradleException("Unexpected SuperbWarfare JAR SHA-256: ${actual}")
+        }
+        logger.lifecycle("Verified SuperbWarfare production JAR SHA-256 ${actual}")
+    }
+}
+
+tasks.register('prepareProductionClientSmoke', Copy) {
+    description = 'Stages reobfuscated Tactical Jammer and exact runtime dependencies for runClient.'
+    group = 'verification'
+    dependsOn tasks.named('reobfJar'), tasks.named('prepareSbwProductionJar')
+    into layout.buildDirectory.dir('production-client-smoke/mods')
+    from(tasks.named('jar').flatMap { it.archiveFile })
+    from(preparedSbwProductionJar)
+    from('run/mods') {
+        include 'curios-forge-5.14.1+1.20.1.jar'
+        include 'geckolib-forge-1.20.1-4.4.6.jar'
+        include 'kotlinforforge-4.11.0-all.jar'
+    }
+    doLast {
+        File mods = layout.buildDirectory.dir('production-client-smoke/mods').get().asFile
+        List<String> required = [
+                'tactical_jammer.jar',
+                sbwProductionFileName,
+                'curios-forge-5.14.1+1.20.1.jar',
+                'geckolib-forge-1.20.1-4.4.6.jar',
+                'kotlinforforge-4.11.0-all.jar'
+        ]
+        List<String> missing = required.findAll { !new File(mods, it).isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Missing production smoke dependencies: ${missing.join(', ')}")
+        }
+    }
+}
+
+tasks.register('productionClientSmoke', JavaExec) {
+    description = 'Launches the reobfuscated mod and exact SBW JAR in the Forge production/SRG namespace.'
+    group = 'verification'
+    dependsOn 'prepareRunClient', tasks.named('prepareProductionClientSmoke')
+    mainClass = 'cpw.mods.bootstraplauncher.BootstrapLauncher'
+    workingDir layout.buildDirectory.dir('production-client-smoke')
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+
+    doFirst {
+        List<File> runtime = tasks.getByName('runClient').runtimeClasspathArtifacts.files.toList()
+        File mappedJar = runtime.find { it.absolutePath.contains('1.20.1-47.4.20_mapped_official_1.20.1') }
+        File srgJar = file("${gradle.gradleUserHomeDir}/caches/forge_gradle/minecraft_user_repo/" +
+                'net/minecraftforge/forge/1.20.1-47.4.20/forge-1.20.1-47.4.20-srg.jar')
+        if (mappedJar == null || !srgJar.isFile()) {
+            throw new GradleException('ForgeGradle production/SRG artifacts are unavailable')
+        }
+        List<File> productionRuntime = runtime.collect { it == mappedJar ? srgJar : it }
+
+        File productionClasspathFile = layout.buildDirectory
+                .file('production-client-smoke/legacy-classpath.txt').get().asFile
+        productionClasspathFile.parentFile.mkdirs()
+        productionClasspathFile.text = productionRuntime.collect { it.absolutePath }.join(System.lineSeparator())
+
+        File libraryDirectory = layout.buildDirectory.dir('production-client-smoke/libraries').get().asFile
+        def stageLibrary = { File source, String relativePath ->
+            if (source == null || !source.isFile()) {
+                throw new GradleException("Missing production library for ${relativePath}")
+            }
+            File destination = new File(libraryDirectory, relativePath)
+            destination.parentFile.mkdirs()
+            java.nio.file.Files.copy(source.toPath(), destination.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+        String mcMcpVersion = '1.20.1-20230612.114412'
+        File joinedSrg = file("${gradle.gradleUserHomeDir}/caches/forge_gradle/mcp_repo/" +
+                "net/minecraft/joined/${mcMcpVersion}/joined-${mcMcpVersion}-srg.jar")
+        File clientExtra = runtime.find { it.name == 'client-extra.jar' }
+        File binpatched = file("${gradle.gradleUserHomeDir}/caches/forge_gradle/minecraft_user_repo/" +
+                'net/minecraftforge/forge/1.20.1-47.4.20/forge-1.20.1-47.4.20-binpatched.jar')
+        File universal = file("${gradle.gradleUserHomeDir}/caches/forge_gradle/maven_downloader/" +
+                'net/minecraftforge/forge/1.20.1-47.4.20/forge-1.20.1-47.4.20-universal.jar')
+        stageLibrary(joinedSrg,
+                "net/minecraft/client/${mcMcpVersion}/client-${mcMcpVersion}-srg.jar")
+        stageLibrary(clientExtra,
+                "net/minecraft/client/${mcMcpVersion}/client-${mcMcpVersion}-extra.jar")
+        stageLibrary(binpatched,
+                'net/minecraftforge/forge/1.20.1-47.4.20/forge-1.20.1-47.4.20-client.jar')
+        stageLibrary(universal,
+                'net/minecraftforge/forge/1.20.1-47.4.20/forge-1.20.1-47.4.20-universal.jar')
+        ['fmlcore', 'javafmllanguage', 'lowcodelanguage', 'mclanguage'].each { artifact ->
+            File source = runtime.find { it.name == "${artifact}-1.20.1-47.4.20.jar" }
+            stageLibrary(source,
+                    "net/minecraftforge/${artifact}/1.20.1-47.4.20/${artifact}-1.20.1-47.4.20.jar")
+        }
+
+        List<String> moduleNames = [
+                'bootstraplauncher-', 'securejarhandler-', 'asm-commons-', 'asm-util-',
+                'asm-analysis-', 'asm-tree-', 'asm-', 'JarJarFileSystems-'
+        ]
+        List<File> modules = productionRuntime.findAll { candidate ->
+            moduleNames.any { marker -> candidate.name.startsWith(marker) }
+        }
+
+        classpath = files(productionRuntime)
+        setJvmArgs([
+                '-Dforge.enableGameTest=true',
+                '-Dforge.logging.console.level=info',
+                '-Dforge.logging.markers=REGISTRIES',
+                '-DignoreList=bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,' +
+                        'asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage,' +
+                        'lowcodelanguage,mclanguage,forge-',
+                '-Djava.net.preferIPv6Addresses=system',
+                "-DlegacyClassPath.file=${productionClasspathFile.absolutePath}",
+                "-DlibraryDirectory=${libraryDirectory.absolutePath}",
+                '-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar',
+                '-p', modules.collect { it.absolutePath }.join(File.pathSeparator),
+                '--add-modules', 'ALL-MODULE-PATH',
+                '--add-opens', 'java.base/java.util.jar=cpw.mods.securejarhandler',
+                '--add-opens', 'java.base/java.lang.invoke=cpw.mods.securejarhandler',
+                '--add-exports', 'java.base/sun.security.util=cpw.mods.securejarhandler',
+                '--add-exports', 'jdk.naming.dns/com.sun.jndi.dns=java.naming'
+        ])
+        setArgs([
+                '--launchTarget', 'forgeclient',
+                '--version', 'PRODUCTION_SMOKE',
+                '--username', 'ForgeDev',
+                '--uuid', '00000000000000000000000000000000',
+                '--accessToken', '0',
+                '--userType', 'legacy',
+                '--versionType', 'release',
+                '--assetIndex', '5',
+                '--assetsDir', file("${gradle.gradleUserHomeDir}/caches/forge_gradle/assets").absolutePath,
+                '--gameDir', '.',
+                '--fml.forgeVersion', '47.4.20',
+                '--fml.mcVersion', '1.20.1',
+                '--fml.forgeGroup', 'net.minecraftforge',
+                '--fml.mcpVersion', '20230612.114412'
+        ])
+    }
 }
 
 tasks.named('processResources', ProcessResources).configure {
@@ -79,6 +266,25 @@ tasks.withType(JavaCompile).configureEach {
 tasks.named('test', Test).configure {
     useJUnitPlatform()
     exclude '**/JammerLoadTest.class'
+    exclude '**/SbwMixinContractTest.class'
+}
+
+tasks.register('verifySbwMixinContract', Test) {
+    description = 'Checks all Tactical Jammer mixin members against the exact SBW production JAR.'
+    group = 'verification'
+    dependsOn tasks.named('prepareSbwProductionJar'), tasks.named('testClasses')
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/SbwMixinContractTest.class'
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty 'sbw.production.jar', preparedSbwProductionJar.get().asFile.absolutePath
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifySbwMixinContract')
 }
 
 tasks.register('jammerLoadTest', Test) {

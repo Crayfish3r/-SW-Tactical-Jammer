@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.sbwdronejammer.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "sbwdronejammer.refmap.json",
+  "mixins": [
+    "DroneEntityMixin"
+  ],
+  "client": [
+    "client.DroneEntityClientMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

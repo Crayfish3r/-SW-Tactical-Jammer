@@ -1,6 +1,5 @@
 package dev.sbwdronejammer.item;
 
-import dev.sbwdronejammer.config.JammerConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -53,7 +52,7 @@ public final class DroneJammerItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip.sbwdronejammer.range", JammerConfig.RANGE.get())
+        tooltip.add(Component.translatable("tooltip.sbwdronejammer.range")
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(isActive(stack)
                         ? "tooltip.sbwdronejammer.active"

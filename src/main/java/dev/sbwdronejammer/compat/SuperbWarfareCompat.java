@@ -7,6 +7,9 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.Optional;
+import java.util.UUID;
+
 public final class SuperbWarfareCompat {
     public static final ResourceLocation DRONE_ID = new ResourceLocation("superbwarfare", "drone");
     public static final ResourceLocation MONITOR_ID = new ResourceLocation("superbwarfare", "monitor");
@@ -51,6 +54,21 @@ public final class SuperbWarfareCompat {
                 && monitor.hasTag()
                 && monitor.getTag().getBoolean("Linked")
                 && drone.getStringUUID().equals(monitor.getTag().getString("LinkedDrone"));
+    }
+
+    public static Optional<UUID> linkedDroneId(ItemStack monitor) {
+        if (!isMonitor(monitor) || !monitor.hasTag() || !monitor.getTag().getBoolean("Linked")) {
+            return Optional.empty();
+        }
+        String value = monitor.getTag().getString("LinkedDrone");
+        if (value.length() != 36) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(UUID.fromString(value));
+        } catch (IllegalArgumentException ignored) {
+            return Optional.empty();
+        }
     }
 
     private SuperbWarfareCompat() {

@@ -2,7 +2,7 @@
   "item.sbwdronejammer.drone_jammer": "Drone Jammer",
   "message.sbwdronejammer.enabled": "Drone jammer enabled.",
   "message.sbwdronejammer.disabled": "Drone jammer disabled.",
-  "tooltip.sbwdronejammer.range": "Interference range: %s blocks",
+  "tooltip.sbwdronejammer.range": "Interference range: server controlled",
   "tooltip.sbwdronejammer.active": "Status: ON",
   "tooltip.sbwdronejammer.inactive": "Status: OFF",
   "tooltip.sbwdronejammer.toggle": "Right-click to toggle"

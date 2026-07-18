@@ -26,6 +26,6 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="superbwarfare"
 mandatory=true
-versionRange="[0,)"
+versionRange="[0.8.9,0.9)"
 ordering="AFTER"
 side="BOTH"

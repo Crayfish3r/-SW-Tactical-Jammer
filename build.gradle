@@ -46,6 +46,10 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
 }
 
 tasks.named('processResources', ProcessResources).configure {
@@ -72,8 +76,26 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    exclude '**/JammerLoadTest.class'
+}
+
+tasks.register('jammerLoadTest', Test) {
+    description = 'Runs the deterministic jammer scanner load test.'
+    group = 'verification'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/JammerLoadTest.class'
+    outputs.upToDateWhen { false }
+}
+
 jar {
     archiveFileName = 'tactical_jammer.jar'
+    manifest {
+        attributes 'MixinConfigs': 'sbwdronejammer.mixins.json'
+    }
     finalizedBy 'reobfJar'
 }
 

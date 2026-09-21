@@ -1,6 +1,7 @@
 package dev.sbwdronejammer;
 
 import dev.sbwdronejammer.config.JammerConfig;
+import dev.sbwdronejammer.config.RadarClientConfig;
 import dev.sbwdronejammer.network.ModNetwork;
 import dev.sbwdronejammer.registry.ModItems;
 import net.minecraftforge.common.MinecraftForge;
@@ -19,6 +20,7 @@ public final class SBWDroneJammer {
         ModItems.register(modBus);
         ModNetwork.register();
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, JammerConfig.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, RadarClientConfig.SPEC);
         MinecraftForge.EVENT_BUS.register(this);
     }
 }

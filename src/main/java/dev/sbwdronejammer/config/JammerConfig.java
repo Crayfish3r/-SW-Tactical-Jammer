@@ -19,6 +19,7 @@ public final class JammerConfig {
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
         builder.push("droneJammer");
+
         RANGE = builder
                 .comment("Jammer radius in blocks.")
                 .defineInRange("range", 32, 1, 256);
@@ -26,7 +27,7 @@ public final class JammerConfig {
                 .comment("If true, a jammer affects every drone, including drones linked to its owner.")
                 .define("affectFriendlyDrones", true);
         SCAN_INTERVAL_TICKS = builder
-                .comment("Server ticks between irreversible jammer scans.")
+                .comment("Server ticks between jammer scans.")
                 .defineInRange("scanIntervalTicks", 5, 1, 20);
         RADAR_INTERVAL_TICKS = builder
                 .comment("Server ticks between independent radar updates.")
@@ -38,7 +39,10 @@ public final class JammerConfig {
                 .comment("Downward acceleration per falling tick before SBW gravity.")
                 .defineInRange("fallAcceleration", 0.08, 0.0, 0.5);
         TERMINAL_FALL_SPEED = builder
-                .comment("Maximum forced downward speed before SBW applies its own gravity.")
+                .comment(
+                        "Maximum forced downward speed before SBW applies its own gravity.",
+                        "If lower than initialDownwardSpeed, the initial speed is used as the terminal speed."
+                )
                 .defineInRange("terminalFallSpeed", 1.4, 0.1, 5.0);
         HORIZONTAL_MOMENTUM_MULTIPLIER = builder
                 .comment("Fraction of horizontal momentum retained each falling tick.")
@@ -52,6 +56,7 @@ public final class JammerConfig {
         MAX_FALL_TICKS = builder
                 .comment("Failsafe ticks before an airborne falling drone receives crash damage.")
                 .defineInRange("maxFallTicks", 1200, 20, 72000);
+
         builder.pop();
         SPEC = builder.build();
     }

@@ -24,13 +24,29 @@ public final class FallPhysics {
                              double terminalFallSpeed,
                              double horizontalMomentumMultiplier) {
         public Parameters {
-            if (initialDownwardSpeed <= 0.0
+            if (!Double.isFinite(initialDownwardSpeed)
+                    || !Double.isFinite(fallAcceleration)
+                    || !Double.isFinite(terminalFallSpeed)
+                    || !Double.isFinite(horizontalMomentumMultiplier)
+                    || initialDownwardSpeed <= 0.0
                     || fallAcceleration < 0.0
                     || terminalFallSpeed < initialDownwardSpeed
                     || horizontalMomentumMultiplier < 0.0
                     || horizontalMomentumMultiplier > 1.0) {
                 throw new IllegalArgumentException("Invalid falling parameters");
             }
+        }
+
+        public static Parameters fromConfig(double initialDownwardSpeed,
+                                            double fallAcceleration,
+                                            double terminalFallSpeed,
+                                            double horizontalMomentumMultiplier) {
+            return new Parameters(
+                    initialDownwardSpeed,
+                    fallAcceleration,
+                    Math.max(initialDownwardSpeed, terminalFallSpeed),
+                    horizontalMomentumMultiplier
+            );
         }
     }
 

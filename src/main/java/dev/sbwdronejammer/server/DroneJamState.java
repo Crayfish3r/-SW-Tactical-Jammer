@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public final class DroneJamState {
     private static final String PREFIX = SBWDroneJammer.MOD_ID + ":";
+
     public static final String FALLING = PREFIX + "Falling";
     public static final String DRONE_ID = PREFIX + "DroneId";
     public static final String JAMMER_OWNER = PREFIX + "JammerOwner";
@@ -18,26 +19,38 @@ public final class DroneJamState {
     public static final String IMPACT_PROCESSED = PREFIX + "ImpactProcessed";
 
     public static boolean begin(Entity drone, UUID jammerOwner, long triggerTick) {
-        return begin(drone.getPersistentData(), drone.getUUID(), jammerOwner, triggerTick, !drone.onGround());
+        CompoundTag data = drone.getPersistentData();
+        repairInvalidState(data);
+        if (drone.onGround()) {
+            return false;
+        }
+        return begin(data, drone.getUUID(), jammerOwner, triggerTick, true);
     }
 
     public static boolean begin(CompoundTag data, UUID droneId, UUID jammerOwner,
                                 long triggerTick, boolean airborne) {
-        if (data.getBoolean(FALLING)) {
+        repairInvalidState(data);
+        if (!airborne || data.getBoolean(FALLING)) {
             return false;
         }
+
         data.putBoolean(FALLING, true);
         data.putUUID(DRONE_ID, droneId);
         data.putUUID(JAMMER_OWNER, jammerOwner);
         data.putLong(TRIGGER_TICK, triggerTick);
         data.putInt(FALL_TICKS, 0);
-        data.putBoolean(FALL_ARMED, airborne);
+        data.putBoolean(FALL_ARMED, true);
         data.putBoolean(IMPACT_PROCESSED, false);
         return true;
     }
 
     public static boolean isFalling(Entity drone) {
-        return drone.getPersistentData().getBoolean(FALLING);
+        return isFalling(drone.getPersistentData());
+    }
+
+    public static boolean isFalling(CompoundTag data) {
+        repairInvalidState(data);
+        return data.getBoolean(FALLING);
     }
 
     public static int fallTicks(Entity drone) {
@@ -59,11 +72,29 @@ public final class DroneJamState {
     }
 
     public static boolean markImpactProcessed(CompoundTag data) {
-        if (!data.getBoolean(FALLING) || data.getBoolean(IMPACT_PROCESSED)) {
+        repairInvalidState(data);
+        if (!data.getBoolean(FALLING)
+                || !data.getBoolean(FALL_ARMED)
+                || data.getBoolean(IMPACT_PROCESSED)) {
             return false;
         }
+
         data.putBoolean(IMPACT_PROCESSED, true);
         return true;
+    }
+
+    public static void clear(Entity drone) {
+        clear(drone.getPersistentData());
+    }
+
+    public static void clear(CompoundTag data) {
+        data.remove(FALLING);
+        data.remove(DRONE_ID);
+        data.remove(JAMMER_OWNER);
+        data.remove(TRIGGER_TICK);
+        data.remove(FALL_TICKS);
+        data.remove(FALL_ARMED);
+        data.remove(IMPACT_PROCESSED);
     }
 
     public static Optional<UUID> jammerOwner(Entity drone) {
@@ -72,17 +103,34 @@ public final class DroneJamState {
     }
 
     public static Snapshot read(CompoundTag data) {
+        repairInvalidState(data);
         Status status = !data.getBoolean(FALLING)
                 ? Status.NORMAL
                 : data.getBoolean(IMPACT_PROCESSED) ? Status.IMPACT_PROCESSED : Status.FALLING;
         UUID droneId = data.hasUUID(DRONE_ID) ? data.getUUID(DRONE_ID) : null;
         UUID jammerOwner = data.hasUUID(JAMMER_OWNER) ? data.getUUID(JAMMER_OWNER) : null;
-        return new Snapshot(status, droneId, jammerOwner, data.getLong(TRIGGER_TICK),
-                Math.max(0, data.getInt(FALL_TICKS)), data.getBoolean(FALL_ARMED),
-                data.getBoolean(IMPACT_PROCESSED));
+        return new Snapshot(
+                status,
+                droneId,
+                jammerOwner,
+                data.getLong(TRIGGER_TICK),
+                Math.max(0, data.getInt(FALL_TICKS)),
+                data.getBoolean(FALL_ARMED),
+                data.getBoolean(IMPACT_PROCESSED)
+        );
     }
 
-    public enum Status { NORMAL, FALLING, IMPACT_PROCESSED }
+    private static void repairInvalidState(CompoundTag data) {
+        if (data.getBoolean(FALLING) && !data.getBoolean(FALL_ARMED)) {
+            clear(data);
+        }
+    }
+
+    public enum Status {
+        NORMAL,
+        FALLING,
+        IMPACT_PROCESSED
+    }
 
     public record Snapshot(Status status, UUID droneId, UUID jammerOwner, long triggerTick,
                            int fallTicks, boolean armed, boolean impactProcessed) {

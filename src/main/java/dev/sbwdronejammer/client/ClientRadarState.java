@@ -14,12 +14,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-@Mod.EventBusSubscriber(modid = SBWDroneJammer.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = SBWDroneJammer.MOD_ID, value = Dist.CLIENT,
+        bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ClientRadarState {
     private static final long POSITION_BLEND_NANOS = 280_000_000L;
     private static final long CONTACT_HOLD_NANOS = 6_000_000_000L;
     private static final long CONTACT_FADE_NANOS = 2_000_000_000L;
-    private static final double MATCH_DISTANCE_SQUARED = 12.0 * 12.0;
+
     private static final List<TrackedContact> contacts = new ArrayList<>();
     private static boolean active;
     private static int serverRange = 32;
@@ -41,23 +42,26 @@ public final class ClientRadarState {
         active = hasActiveJammer(player);
         if (!active) {
             contacts.clear();
+            nextContactId = 0;
             return;
         }
 
         long now = System.nanoTime();
-        contacts.removeIf(contact -> now - contact.lastSeenNanos > CONTACT_HOLD_NANOS + CONTACT_FADE_NANOS);
+        contacts.removeIf(contact -> now - contact.lastSeenNanos
+                > CONTACT_HOLD_NANOS + CONTACT_FADE_NANOS);
     }
 
     public static void acceptServerContacts(int range, List<RadarContact> serverContacts) {
         serverRange = range;
         long now = System.nanoTime();
         List<TrackedContact> unmatched = new ArrayList<>(contacts);
+
         for (RadarContact incoming : serverContacts) {
             TrackedContact match = unmatched.stream()
                     .filter(contact -> contact.friendly == incoming.friendly())
                     .min(Comparator.comparingDouble(contact -> contact.distanceSquaredTo(incoming)))
-                    .filter(contact -> contact.distanceSquaredTo(incoming) <= MATCH_DISTANCE_SQUARED)
                     .orElse(null);
+
             if (match == null) {
                 contacts.add(new TrackedContact(nextContactId++, incoming, now));
             } else {
@@ -99,6 +103,7 @@ public final class ClientRadarState {
     private static void clear() {
         active = false;
         contacts.clear();
+        nextContactId = 0;
     }
 
     public record RadarContact(double dx, double dz, boolean friendly) {
@@ -144,7 +149,10 @@ public final class ClientRadarState {
         }
 
         private VisibleContact sample(long now) {
-            double blend = Math.min(1.0, Math.max(0.0, (now - updateNanos) / (double) POSITION_BLEND_NANOS));
+            double blend = Math.min(
+                    1.0,
+                    Math.max(0.0, (now - updateNanos) / (double) POSITION_BLEND_NANOS)
+            );
             blend = 1.0 - Math.pow(1.0 - blend, 3.0);
             double x = fromX + (targetX - fromX) * blend;
             double z = fromZ + (targetZ - fromZ) * blend;

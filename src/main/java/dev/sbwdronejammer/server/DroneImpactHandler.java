@@ -24,6 +24,7 @@ public final class DroneImpactHandler {
         if (!collision && !belowWorld && !timedOut) {
             return;
         }
+
         if (!DroneJamState.markImpactProcessed(drone.getPersistentData())) {
             return;
         }
@@ -33,12 +34,20 @@ public final class DroneImpactHandler {
                 .orElse(null);
         DamageSource crashSource = attacker == null
                 ? drone.damageSources().genericKill()
-                : new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
-                        .getHolderOrThrow(DamageTypes.GENERIC_KILL), attacker);
+                : new DamageSource(
+                        level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
+                                .getHolderOrThrow(DamageTypes.GENERIC_KILL),
+                        attacker
+                );
         float damage = JammerConfig.ALWAYS_DESTROY_ON_IMPACT.get()
                 ? Float.MAX_VALUE
                 : Math.max(20.0F, (float) (-drone.getDeltaMovement().y * 100.0));
+
         drone.hurt(crashSource, damage);
+
+        if (!drone.isRemoved() && drone.isAlive()) {
+            DroneJamManager.clearFalling(drone);
+        }
     }
 
     private DroneImpactHandler() {
